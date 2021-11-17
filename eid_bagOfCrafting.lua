@@ -49,7 +49,7 @@ local pickupIDLookup = {
 	["10.7"] = {5}, -- gold heart
 	["10.8"] = {2}, -- half soul heart
 	["10.9"] = {1}, -- scared red heart
-	["10.10"] = {1, 2}, -- blended heart
+	["10.10"] = {2, 1}, -- blended heart
 	["10.11"] = {6}, -- Bone heart
 	["10.12"] = {7}, -- Rotten heart
 	["20.1"] = {8}, -- Penny
@@ -458,7 +458,7 @@ local function shiftBagContent()
 	EID.BagItems = newContent
 end
 
--- only Tainted Cain's consumable slot bag can have its ingredients shifted... probably?
+-- only Tainted Cain's consumable slot bag can have its ingredients shifted
 local function detectBagContentShift()
 	if Input.IsActionTriggered(ButtonAction.ACTION_DROP, EID.player.ControllerIndex) and IsTaintedCain() then
 		shiftBagContent()
@@ -730,6 +730,8 @@ function EID:handleBagOfCraftingRendering()
 		end
 		local bagDesc = EID:getDescriptionEntry("CraftingBagContent").."(Beta)"
 		EID:appendToDescription(customDescObj, bagDesc..EID:tableToCraftingIconsMerged(EID.BagItems).."#")
+		--debug the bag order
+		--EID:appendToDescription(customDescObj, EID:tableToCraftingIconsFull(EID.BagItems, false).."#")
 	end
 	if #roomItems >0 then
 		if #roomItems == 8 then
