@@ -225,6 +225,66 @@ function EID:getBagOfCraftingID(Variant, SubType)
 	return nil
 end
 
+--not a very unified set; [7] = The Poop, [9] = The Left Hand; these aren't too important, they are poop nugget and cracked key
+--however, [26] should be Planetarium, we need Planetarium and Ultra Secret Room icons added to the PNG
+local poolToIcon = { [0]="{{TreasureRoom}}",[1]="{{Shop}}",[2]="{{BossRoom}}",[3]="{{DevilRoom}}",[4]="{{AngelRoom}}",
+[5]="{{SecretRoom}}",[7]="{{Collectible36}}",[8]="{{ChestRoom}}",[9]="{{Trinket61}}",[12]="{{CursedRoom}}",[26]="{{Collectible158}}" }
+
+function EID:simulateBagOfCrafting(componentsTable)
+	local components = componentsTable
+	local compTotalWeight = 0
+	local compCounts = {}
+	for i = 1, #componentShifts do
+		compCounts[i] = 0
+	end
+	for _, compId in ipairs(components) do
+		--8 components max. take care of it here so simplified mode doesn't even have to truncate the floor's pickups list to the most valuable, just sort
+		if (_ > 8) then break end
+		compCounts[compId + 1] = compCounts[compId + 1] + 1
+		compTotalWeight = compTotalWeight + pickupValues[compId + 1]
+	end
+	
+	local poolWeights = {
+		{idx = 0, weight = 1},
+		{idx = 1, weight = 2},
+		{idx = 2, weight = 2},
+		{idx = 3, weight = compCounts[4] * 10},
+		{idx = 4, weight = compCounts[5] * 10},
+		{idx = 5, weight = compCounts[7] * 5},
+		{idx = 7, weight = compCounts[30] * 10},
+		{idx = 8, weight = compCounts[6] * 10},
+		{idx = 9, weight = compCounts[26] * 10},
+		{idx = 12, weight = compCounts[8] * 10},
+	}
+	if compCounts[9] + compCounts[2] + compCounts[13] + compCounts[16] == 0 then
+		table.insert(poolWeights, {idx = 26, weight = compCounts[24] * 10})
+	end
+	
+	local qualityMin = 0
+	local qualityMax = 1
+	local n = compTotalWeight
+	if n > 22 then
+		qualityMax = 4
+	elseif n > 18 then
+		qualityMax = 3
+	elseif n > 8 then
+		qualityMax = 2
+	end
+	--there's a 5 quality increase needed for the Angel/Devil/Secret pools (so component quality total 40 is required for guaranteed quality 4, etc.)
+	--so that changes the potential minimum quality possible
+	if (poolWeights[3] > 0 or poolWeights[4] > 0 or poolWeights[5] > 0) then n = n - 5 end
+	if n > 34 then
+		qualityMin = 4
+	elseif n > 26 then
+		qualityMin = 3
+	elseif n > 18 then
+		qualityMin = 2
+	elseif n > 14 then
+		qualityMin = 1
+	end
+	return compTotalWeight, qualityMin, qualityMax, poolWeights
+end
+
 function EID:calculateBagOfCrafting(componentsTable)
 	local components = {table.unpack(componentsTable)}
 	if components == nil or #components ~= 8 then
@@ -293,9 +353,6 @@ function EID:calculateBagOfCrafting(componentsTable)
 			end
 			if n > 34 then
 				qualityMin = 4
-				qualityMax = 4
-			elseif n > 30 then
-				qualityMin = 3
 				qualityMax = 4
 			elseif n > 26 then
 				qualityMin = 3
@@ -749,6 +806,11 @@ function EID:handleBagOfCraftingRendering()
 		local floorDesc = EID:getDescriptionEntry("CraftingFloorContent")
 		EID:appendToDescription(customDescObj, floorDesc..EID:tableToCraftingIconsMerged(EID.bagOfCraftingFloorQuery).."#")
 	end
+	
+	--Simplified mode WIP
+	EID:simulateBagOfCrafting(EID.BagItems)
+	EID:simulateBagOfCrafting(itemQuery)
+	
 	
 	local resultDesc = EID:getDescriptionEntry("CraftingResults")
 	EID:appendToDescription(customDescObj, resultDesc)
