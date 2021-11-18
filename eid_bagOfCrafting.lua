@@ -260,29 +260,79 @@ function EID:simulateBagOfCrafting(componentsTable)
 		table.insert(poolWeights, {idx = 26, weight = compCounts[24] * 10})
 	end
 	
-	local qualityMin = 0
-	local qualityMax = 1
+	for k,v in ipairs(poolWeights) do
+		v.totalWeight = 0
+		--poolTotalWeight = poolTotalWeight + v.weight
+	end
+	local totalWeight = 0
+	
+	local trueQualityMin = 0
+	local trueQualityMax = 1
 	local n = compTotalWeight
 	if n > 22 then
-		qualityMax = 4
+		trueQualityMax = 4
 	elseif n > 18 then
-		qualityMax = 3
+		trueQualityMax = 3
 	elseif n > 8 then
-		qualityMax = 2
+		trueQualityMax = 2
 	end
 	--there's a 5 quality increase needed for the Angel/Devil/Secret pools (so component quality total 40 is required for guaranteed quality 4, etc.)
 	--so that changes the potential minimum quality possible
-	if (poolWeights[3] > 0 or poolWeights[4] > 0 or poolWeights[5] > 0) then n = n - 5 end
+	if (poolWeights[4].weight > 0 or poolWeights[5].weight > 0 or poolWeights[6].weight > 0) then n = n - 5 end
 	if n > 34 then
-		qualityMin = 4
+		trueQualityMin = 4
 	elseif n > 26 then
-		qualityMin = 3
+		trueQualityMin = 3
 	elseif n > 18 then
-		qualityMin = 2
+		trueQualityMin = 2
 	elseif n > 14 then
-		qualityMin = 1
+		trueQualityMin = 1
 	end
-	return compTotalWeight, qualityMin, qualityMax, poolWeights
+	
+	local qualityWeights = {[0]=0, 0, 0, 0, 0}
+	
+	for _, poolWeight in ipairs(poolWeights) do
+		if poolWeight.weight > 0 then
+			local qualityMin = 0
+			local qualityMax = 1
+			local n = compTotalWeight
+			if (poolWeight.idx >= 3) and (poolWeight.idx <= 5) then
+				n = n - 5
+			end
+			if n > 34 then
+				qualityMin = 4
+				qualityMax = 4
+			elseif n > 26 then
+				qualityMin = 3
+				qualityMax = 4
+			elseif n > 22 then
+				qualityMin = 2
+				qualityMax = 4
+			elseif n > 18 then
+				qualityMin = 2
+				qualityMax = 3
+			elseif n > 14 then
+				qualityMin = 1
+				qualityMax = 2
+			elseif n > 8 then
+				qualityMin = 0
+				qualityMax = 2
+			end
+			local pool = EID.XMLItemPools[poolWeight.idx + 1]
+			
+			for _, item in ipairs(pool) do
+				local quality = EID.XMLItemQualities[item[1]]
+				if quality >= qualityMin and quality <= qualityMax  then
+					local w = item[2] * poolWeight.weight
+					poolWeight.totalWeight = poolWeight.totalWeight + w
+					qualityWeights[quality] = qualityWeights[quality] + w
+					totalWeight = totalWeight + w
+				end
+			end
+		end
+	end
+	
+	return compTotalWeight, trueQualityMin, trueQualityMax, poolWeights, qualityWeights, totalWeight
 end
 
 function EID:calculateBagOfCrafting(componentsTable)
@@ -808,9 +858,48 @@ function EID:handleBagOfCraftingRendering()
 	end
 	
 	--Simplified mode WIP
-	EID:simulateBagOfCrafting(EID.BagItems)
-	EID:simulateBagOfCrafting(itemQuery)
+	--total weight, quality min, quality max, pool weights, total weight
+	local mostValuableSimp = {}
+	for i=1,8 do
+		mostValuableSimp[i] = itemQuery[i]
+	end
 	
+	local bagResult = {EID:simulateBagOfCrafting(EID.BagItems)}
+	bagResult = {EID:simulateBagOfCrafting(mostValuableSimp)}
+	
+	EID:appendToDescription(customDescObj, "Best Quality: " .. bagResult[1] .. " (" .. EID:tableToCraftingIconsFull(mostValuableSimp, false) .. ")#")
+	
+	--[[if bagResult[2] ~= bagResult[3] then
+		EID:appendToDescription(customDescObj, "Best Quality: " .. bagResult[1] .. " ({{Quality" .. bagResult[2] .. "}}-{{Quality" .. bagResult[3] .. "}})#")
+	else
+		EID:appendToDescription(customDescObj, "Best Quality: " .. bagResult[1] .. " ({{Quality" .. bagResult[2] .. "}})#")
+	end]]
+	local poolString = ""
+	local first = true
+	local firstAfterBoss = false
+	for k,v in ipairs(bagResult[4]) do
+		if (v.weight > 0) then
+			if (not first) then poolString = poolString .. "," end
+			--line break after boss pool
+			if (firstAfterBoss) then poolString = poolString .. " " end
+
+			poolString = poolString .. poolToIcon[v.idx] .. ":" .. math.floor(v.totalWeight/bagResult[6]*100+0.5) .. "%"
+			
+			first = false
+			if (k == 3) then firstAfterBoss = true else firstAfterBoss = false end
+		end
+	end
+	poolString = poolString .. "#"
+	first = true
+	for i=0,4 do
+		local v = bagResult[5][i]
+		if (v > 0) then
+			if (not first) then poolString = poolString .. "," end
+			poolString = poolString .. "{{Quality" .. i .. "}}:" .. math.floor(v/bagResult[6]*100+0.5) .. "%"
+			first = false
+		end
+	end
+	EID:appendToDescription(customDescObj, poolString .. "#")
 	
 	local resultDesc = EID:getDescriptionEntry("CraftingResults")
 	EID:appendToDescription(customDescObj, resultDesc)
