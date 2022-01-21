@@ -785,17 +785,6 @@ function EID:setPlayer()
 		EID.player = p
 	end
 end
-
-if REPENTANCE then
-	function EID:removeWrongGuppyEyeInfo(effectEntity)
-		if EID.pathCheckerEntity ~= nil and effectEntity.Parent ~= nil then
-			if GetPtrHash(effectEntity.Parent) == GetPtrHash(EID.pathCheckerEntity) then
-				effectEntity:Remove()
-			end
-		end
-	end
-	EID:AddCallback(ModCallbacks.MC_POST_EFFECT_UPDATE, EID.removeWrongGuppyEyeInfo, EffectVariant.PICKUP_GHOST)
-end
 ---------------------------------------------------------------------------
 ---------------------------On Update Function------------------------------
 
@@ -809,6 +798,7 @@ function EID:onGameUpdate()
 	EID:setPlayer()
 	
 	--Fix Overlapping Pedestals
+	-- PERFORMANCENOTE move this to a post pickup init or something
 	local curPositions = {}
 	for _, entity in ipairs(Isaac.FindByType(5, 100, -1, true, false)) do
 		local pos = entity.Position
@@ -842,12 +832,8 @@ function EID:onGameUpdate()
 			return
 		end
 		if EID.pathCheckerEntity == nil then
-			--EID.pathCheckerEntity = game:Spawn(17, 3169, EID.player.Position, nullVector, EID.player ,0 , 4354) -- Spawns the EID Helper entity with seed that doesnt spawn rewards
 			-- Spawns an Ultra Greed Door and makes it invisible and intangible
 			EID.pathCheckerEntity = game:Spawn(294, 0, EID.player.Position, nullVector, EID.player, 0, 0)
-			--EID.pathCheckerEntity = game:Spawn(906, 1, EID.player.Position, nullVector, EID.player ,0 , 4354)
-			--EID.pathCheckerEntity = game:Spawn(907, 0, EID.player.Position, nullVector, EID.player ,1 , 4354)
-			print(EID.pathCheckerEntity:GetEntityFlags())
 			EID.pathCheckerEntity:ClearEntityFlags(EntityFlag.FLAG_APPEAR)
 			EID.pathCheckerEntity:AddEntityFlags (EntityFlag.FLAG_PERSISTENT | EntityFlag.FLAG_NO_STATUS_EFFECTS | EntityFlag.FLAG_NO_SPRITE_UPDATE | EntityFlag.FLAG_HIDE_HP_BAR | EntityFlag.FLAG_NO_DEATH_TRIGGER | EntityFlag.FLAG_FRIENDLY)
 			if REPENTANCE then EID.pathCheckerEntity:AddEntityFlags(EntityFlag.FLAG_NO_QUERY) end
@@ -858,7 +844,7 @@ function EID:onGameUpdate()
 			EID.pathCheckerEntity = nil
 		else
 			EID.pathCheckerEntity.Position = EID.player.Position
-			EID.hasValidWalkingpath = EID.pathCheckerEntity:ToNPC().Pathfinder:HasPathToPos ( EID.lastDescriptionEntity.Position, false )
+			EID.hasValidWalkingpath = EID.pathCheckerEntity:ToNPC().Pathfinder:HasPathToPos(EID.lastDescriptionEntity.Position, false)
 			EID.pathfindingTo = EID.lastDescriptionEntity
 		end
 	end
@@ -870,7 +856,7 @@ EID:AddCallback(ModCallbacks.MC_POST_UPDATE, EID.onGameUpdate)
 function EID:updatePathfinding()
 	if not EID.pathCheckerEntity or not EID.lastDescriptionEntity then return end
 	EID.pathCheckerEntity.Position = EID.player.Position
-	EID.hasValidWalkingpath = EID.pathCheckerEntity:ToNPC().Pathfinder:HasPathToPos ( EID.lastDescriptionEntity.Position, false )
+	EID.hasValidWalkingpath = EID.pathCheckerEntity:ToNPC().Pathfinder:HasPathToPos(EID.lastDescriptionEntity.Position, false)
 	EID.pathfindingTo = EID.lastDescriptionEntity
 end
 
@@ -924,8 +910,6 @@ local function onRender(t)
 	EID.isDisplaying = false
 	EID:setPlayer()
 	
-	--Keyboard hide keys are 32+, controller hide keys have their own option now so don't allow controller inputs in it
-	if EID.Config["HideKey"] < 32 then EID.Config["HideKey"] = -1 end
 	if Input.IsButtonTriggered(EID.Config["HideKey"], 0) or Input.IsButtonTriggered(EID.Config["HideButton"], EID.player.ControllerIndex) then
 		EID.isHidden = not EID.isHidden
 	end
@@ -1053,7 +1037,7 @@ local function onRender(t)
 		return
 	end
 	
-	--Handle Glitched Items
+	-- Handle Glitched Items
 	if closest.Type == 5 and closest.Variant == 100 and closest.SubType > 4294960000 then
 		local glitchedObj = EID:getDescriptionObj(closest.Type, closest.Variant, closest.SubType)
 		local glitchedDesc = EID:getXMLDescription(closest.Type, closest.Variant, closest.SubType)
@@ -1068,16 +1052,12 @@ local function onRender(t)
 		
 		EID:printDescription(glitchedObj)
 		return
-	end
-	
-	if closest.Type == 1000 and closest.Variant == 76 then
+	-- Handle Dice Room Floor
+	elseif closest.Type == 1000 and closest.Variant == 76 then
 		EID:printDescription(EID:getDescriptionObj(closest.Type, closest.Variant, closest.SubType+1, closest))
 		return
-	end
-	
-	if closest.Type == 6 and closest.Variant == 16 then
-		--Handle Crane Game
-		
+	-- Handle Crane Game
+	elseif closest.Type == 6 and closest.Variant == 16 then
 		if EID.CraneItemType[tostring(closest.InitSeed)] then
 			if EID:getEntityData(closest, "EID_DontHide") ~= true then
 				if (EID:hasCurseBlind() and EID.Config["DisableOnCurse"]) or (game.Challenge == Challenge.CHALLENGE_APRILS_FOOL and EID.Config["DisableOnAprilFoolsChallenge"]) then
@@ -1203,10 +1183,10 @@ if EID.MCMLoaded or REPENTANCE then
 				EID.absorbedSpindown = false
 				
 				if isSave then
-					EID.BagItems = savedEIDConfig["BagContent"]
-					EID.bagOfCraftingRoomQueries = savedEIDConfig["BagFloorContent"]
-					EID.CraneItemType = savedEIDConfig["CraneItemType"]
-					EID.absorbedSpindown = savedEIDConfig["AbsorbedSpindownDice"]
+					EID.BagItems = savedEIDConfig["BagContent"] or {}
+					EID.bagOfCraftingRoomQueries = savedEIDConfig["BagFloorContent"] or {}
+					EID.CraneItemType = savedEIDConfig["CraneItemType"] or {}
+					EID.absorbedSpindown = savedEIDConfig["AbsorbedSpindownDice"] or false
 
 					-- turn list back into dict because json cant save dict indices.
 					local flipItemTable = {}
