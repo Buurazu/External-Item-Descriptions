@@ -842,9 +842,15 @@ function EID:onGameUpdate()
 			return
 		end
 		if EID.pathCheckerEntity == nil then
-			EID.pathCheckerEntity = game:Spawn(17, 3169, EID.player.Position, nullVector, EID.player ,0 , 4354) -- Spawns the EID Helper entity with seed that doesnt spawn rewards
+			--EID.pathCheckerEntity = game:Spawn(17, 3169, EID.player.Position, nullVector, EID.player ,0 , 4354) -- Spawns the EID Helper entity with seed that doesnt spawn rewards
+			-- Spawns an Ultra Greed Door and makes it invisible and intangible
+			EID.pathCheckerEntity = game:Spawn(294, 0, EID.player.Position, nullVector, EID.player, 0, 0)
+			--EID.pathCheckerEntity = game:Spawn(906, 1, EID.player.Position, nullVector, EID.player ,0 , 4354)
+			--EID.pathCheckerEntity = game:Spawn(907, 0, EID.player.Position, nullVector, EID.player ,1 , 4354)
+			print(EID.pathCheckerEntity:GetEntityFlags())
 			EID.pathCheckerEntity:ClearEntityFlags(EntityFlag.FLAG_APPEAR)
-			EID.pathCheckerEntity:AddEntityFlags (EntityFlag.FLAG_PERSISTENT | EntityFlag.FLAG_NO_STATUS_EFFECTS | EntityFlag.FLAG_NO_SPRITE_UPDATE | EntityFlag.FLAG_HIDE_HP_BAR | EntityFlag.FLAG_NO_DEATH_TRIGGER)
+			EID.pathCheckerEntity:AddEntityFlags (EntityFlag.FLAG_PERSISTENT | EntityFlag.FLAG_NO_STATUS_EFFECTS | EntityFlag.FLAG_NO_SPRITE_UPDATE | EntityFlag.FLAG_HIDE_HP_BAR | EntityFlag.FLAG_NO_DEATH_TRIGGER | EntityFlag.FLAG_FRIENDLY)
+			if REPENTANCE then EID.pathCheckerEntity:AddEntityFlags(EntityFlag.FLAG_NO_QUERY) end
 			EID.pathCheckerEntity.EntityCollisionClass = EntityCollisionClass.ENTCOLL_NONE
 			EID.pathCheckerEntity.Visible = false
 			EID.hasValidWalkingpath = false
