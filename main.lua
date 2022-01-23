@@ -441,11 +441,23 @@ end
 ---------------------------------------------------------------------------
 ---------------------------Printing Functions------------------------------
 
+local doneCheck = false
+
 function EID:printDescription(desc)
 	local textScale = Vector(EID.Scale, EID.Scale)
 	local renderPos = EID:getTextPosition()
 	local offsetX = 0
 	EID.lineHeight = EID.Config["LineHeight"]
+	
+	local start = 0
+	local passes = 10000
+	
+	if passes > 1 and doneCheck then return end
+	doneCheck = true
+	
+start = Isaac.GetTime()
+for i=1,passes do
+	
 	if EID.Config["ShowItemIcon"] then
 		local iconType = nil
 		local subType = desc.ObjSubType
@@ -473,6 +485,7 @@ function EID:printDescription(desc)
 			)
 		end
 	end
+
 	--Display ItemType / Charge
 	local itemType = -1
 	if tonumber(desc.ObjSubType) ~= nil and desc.ObjType == 5 and desc.ObjVariant == 100 then
@@ -550,6 +563,12 @@ function EID:printDescription(desc)
 		renderPos.Y = renderPos.Y + EID.lineHeight * EID.Scale
 	end
 
+end
+if passes > 1 then print("First line 10,000: " .. Isaac.GetTime() - start) end
+
+start = Isaac.GetTime()
+for i=1,passes do
+
 	--Display Transformation
 	if not (desc.Transformation == "0" or desc.Transformation == "" or desc.Transformation == nil) then
 		for transform in string.gmatch(desc.Transformation, "([^,]+)") do
@@ -576,31 +595,49 @@ function EID:printDescription(desc)
 			end
 		end
 	end
+	
+end
+if passes > 1 then print("Transformations 10,000: " .. Isaac.GetTime() - start) end
+start = Isaac.GetTime()
+for i=1,passes do
 	EID:printBulletPoints(desc.Description, renderPos)
 end
+if passes > 1 then print("Print bulletpoints 10,000: " .. Isaac.GetTime() - start) end
+end
+
+
+local lastFormattedLines = {}
+local bulletpoints = {}
 
 function EID:printBulletPoints(description, renderPos)
 	local textboxWidth = tonumber(EID.Config["TextboxWidth"])
 	local textScale = Vector(EID.Scale, EID.Scale)
 	description = EID:replaceShortMarkupStrings(description)
-	for line in string.gmatch(description, "([^#]+)") do
-		local formatedLines = EID:fitTextToWidth(line, textboxWidth, EID.BreakUtf8CharsLanguage[EID.Config["Language"]])
-		local textColor = EID:getTextColor()
-		for i, lineToPrint in ipairs(formatedLines) do
-			-- render bulletpoint
-			if i == 1 then
-				local bpIcon = EID:handleBulletpointIcon(lineToPrint)
-				if EID:getIcon(bpIcon) ~= EID.InlineIcons["ERROR"] then
-					lineToPrint = string.gsub(lineToPrint, bpIcon .. " ", "", 1)
-					textColor =	EID:renderString(bpIcon, renderPos + Vector(-3 * EID.Scale, 0), textScale , textColor)
-				else
-					textColor =	EID:renderString(bpIcon, renderPos, textScale , textColor)
-				end
-				EID.LastRenderCallColor = EID:copyKColor(textColor) -- Save line start Color for eventual Color Reset call
+	if #lastFormattedLines == 0 then
+		for line in string.gmatch(description, "([^#]+)") do
+			bulletpoints[#lastFormattedLines+1] = true
+			for i, v in ipairs(EID:fitTextToWidth(line, textboxWidth, EID.BreakUtf8CharsLanguage[EID.Config["Language"]])) do
+				table.insert(lastFormattedLines, v)
 			end
-			textColor =	EID:renderString(lineToPrint, renderPos + Vector(12 * EID.Scale, 0), textScale, textColor)
-				renderPos.Y = renderPos.Y + EID.lineHeight * EID.Scale
 		end
+	end
+		--for k,v in ipairs(lastFormattedLines) do print(v) end
+		--local formatedLines = EID:fitTextToWidth(line, textboxWidth, EID.BreakUtf8CharsLanguage[EID.Config["Language"]])
+	local textColor = EID:getTextColor()
+	for i, lineToPrint in ipairs(lastFormattedLines) do
+		-- render bulletpoint
+		if bulletpoints[i] then
+			local bpIcon = EID:handleBulletpointIcon(lineToPrint)
+			if EID:getIcon(bpIcon) ~= EID.InlineIcons["ERROR"] then
+				lineToPrint = string.gsub(lineToPrint, bpIcon .. " ", "", 1)
+				textColor =	EID:renderString(bpIcon, renderPos + Vector(-3 * EID.Scale, 0), textScale , textColor)
+			else
+				textColor =	EID:renderString(bpIcon, renderPos, textScale , textColor)
+			end
+			EID.LastRenderCallColor = EID:copyKColor(textColor) -- Save line start Color for eventual Color Reset call
+		end
+		textColor =	EID:renderString(lineToPrint, renderPos + Vector(12 * EID.Scale, 0), textScale, textColor)
+			renderPos.Y = renderPos.Y + EID.lineHeight * EID.Scale
 	end
 end
 ---------------------------------------------------------------------------
