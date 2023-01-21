@@ -456,6 +456,7 @@ end
 
 
 function EID:addDescriptionToPrint(desc, insertLoc)
+	desc.Distance = EID.lastDist
 	if desc.Entity and EID.entitiesToPrint[GetPtrHash(desc.Entity)] then return end
 	if #EID.descriptionsToPrint == EID.Config["MaxDescriptionsToDisplay"] and not insertLoc then return end
 	if insertLoc then table.insert(EID.descriptionsToPrint, insertLoc, desc)
@@ -1291,21 +1292,24 @@ local function onRender()
 	elseif EID.Config["PairedPlayerDescriptions"] then
 		playerSearch = EID.players
 	end
-
-	-- Check for descriptions to print per player
-	for _,player in ipairs(playerSearch) do
-		local displayedDesc = false
-		
-		-- Check if this player has the Bag of Crafting
-		local craftingSuccess = false
-		if REPENTANCE and player:HasCollectible(710) then
-			craftingSuccess = EID:handleBagOfCraftingRendering()
-			if craftingSuccess then
-				displayedDesc = true
+	
+	local displayedDesc = {}
+	-- Check for Bag of Crafting per player
+	-- (Do this first because it can't be Local Mode, and should take precedence over other descriptions, even as Player 2+)
+	if REPENTANCE then
+		for playerNum,player in ipairs(playerSearch) do
+			if player:HasCollectible(710) then
+				local craftingSuccess = EID:handleBagOfCraftingRendering()
+				if craftingSuccess then
+					displayedDesc[playerNum] = true
+				end
 			end
 		end
-		
-		if (not displayedDesc or EID.Config["DisplayAllNearby"]) and
+	end
+	
+	-- Check for descriptions to print per player
+	for playerNum,player in ipairs(playerSearch) do
+		if (not displayedDesc[playerNum] or EID.Config["DisplayAllNearby"]) and
 			#EID.descriptionsToPrint < EID.Config["MaxDescriptionsToDisplay"] then
 			-- Searching for the closest describable entity to this player	
 			EID.lastDescriptionEntity = nil
@@ -1322,7 +1326,6 @@ local function onRender()
 			for _, entitySearch in ipairs(searchGroups) do
 				for _, entity in ipairs(entitySearch) do
 					if EID:hasDescription(entity) and entity.FrameCount > 0 and not EID.entitiesToPrint[GetPtrHash(entity)] then
-						table.insert(inRangeEntities, entity)
 						local diff = entity.Position:__sub(sourcePos)
 						-- break ties with the render offset (for Mega Chest double collectibles)
 						if diff:Length() == EID.lastDist and entity:GetData()["EID_RenderOffset"] then
@@ -1332,35 +1335,39 @@ local function onRender()
 							EID.lastDescriptionEntity = entity
 							EID.lastDist = diff:Length()
 						end
+						table.insert(inRangeEntities, { entity, diff:Length() })
 					end
 				end
 			end
 
 			for _, gridEntity in pairs(EID.CurrentRoomGridEntities) do
 				if EID:hasDescription(gridEntity) then
-					table.insert(inRangeEntities, gridEntity)
 					local diff = gridEntity.Position:__sub(sourcePos)
 					if diff:Length() < EID.lastDist then
 						EID.lastDescriptionEntity = gridEntity
 						EID.lastDist = diff:Length()
 					end
+					table.insert(inRangeEntities, { gridEntity, diff:Length() })
 				end
 			end
 			
-			if EID.Config["DisplayAllNearby"] then
-				-- make the closest entity the first to get drawn
-				table.insert(inRangeEntities, 1, EID.lastDescriptionEntity)
-			else
-				-- we only want to describe the closest entity
-				inRangeEntities = { EID.lastDescriptionEntity }
-			end
 			-- Only display the indicator for the primary (closest / crafting) description
 			if EID.lastDescriptionEntity then
+				if EID.Config["DisplayAllNearby"] then
+					-- make the closest entity the first to get drawn
+					table.insert(inRangeEntities, 1, { EID.lastDescriptionEntity, EID.lastDist })
+				else
+					-- we only want to describe the closest entity
+					inRangeEntities = { { EID.lastDescriptionEntity, EID.lastDist } }
+				end
+			
 				EID:renderIndicator(EID.lastDescriptionEntity, EID.controllerIndexes[player.ControllerIndex] or 1)
 				table.insert(EID.CachedIndicators, {EID.lastDescriptionEntity, EID.controllerIndexes[player.ControllerIndex]})
 			end
 			
-			for _,closest in ipairs(inRangeEntities) do
+			for _,v in ipairs(inRangeEntities) do
+				local closest = v[1]
+				EID.lastDist = v[2] -- addDescriptionToPrint will use this, and then we can sort the list by distance if desired
 				if not EID:IsGridEntity(closest) then
 					--Handle GetData Entities (specific)
 					if EID.Config["EnableEntityDescriptions"] and EID:getEntityData(closest, "EID_Description") then
@@ -1513,6 +1520,12 @@ local function onRender()
 			end
 		end
 	end
+	
+	EID.lastDist = 0
+	-- sort the descs by their distance to a player
+	table.sort(EID.descriptionsToPrint, function(a, b)
+		return (a.Distance < b.Distance)
+	end)
 	
 	-- handle showing the Hold Map Helper description
 	if EID.Config["ItemReminderEnabled"] and EID.holdTabCounter >= 30 and EID.TabDescThisFrame == false and EID.holdTabPlayer ~= nil then
